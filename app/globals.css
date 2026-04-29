@@ -3,6 +3,9 @@
 @theme {
   --color-ink: #0e1210;
   --color-paper: #b6b6b6;
+  --color-canvas: #f6f5f1;
+  --color-line: #e6e4dd;
+  --color-muted: #77756d;
 
   /* Display & body: Manrope — geometric sans, modern, looks great at light weights.
      Loaded with weights 200 (ExtraLight) → 500 (Medium) for full identity range. */
@@ -36,4 +39,11 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }

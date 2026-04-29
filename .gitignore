@@ -27,6 +27,7 @@ yarn-error.log*
 # env files
 .env*
 !.env.example
+!.env.local.example
 
 # vercel
 .vercel
@@ -38,3 +39,6 @@ next-env.d.ts
 # IDE
 .idea
 .vscode
+
+# nested cloned repo (separate project, not part of this site)
+/GenericAgent/
