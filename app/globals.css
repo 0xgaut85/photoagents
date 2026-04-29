@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0e1210;
+  --color-paper: #b6b6b6;
+
+  /* Display & body: Manrope — geometric sans, modern, looks great at light weights.
+     Loaded with weights 200 (ExtraLight) → 500 (Medium) for full identity range. */
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+
+  /* Blinking text caret for the typewriter effect on the headline. */
+  --animate-caret-blink: caret-blink 1s steps(2, start) infinite;
+  @keyframes caret-blink {
+    50% {
+      opacity: 0;
+    }
+  }
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+}
+
+* {
+  box-sizing: border-box;
+}
