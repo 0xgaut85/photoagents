@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { CreditCard, ExternalLink, RefreshCcw } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Table } from "../../_components/ui";
 import { useDashboardAuth } from "../../_components/DashboardAuth";
@@ -11,11 +12,8 @@ import {
   type Invoice,
   type Me,
 } from "../../_lib/api";
-import {
-  PLAN_PRICE_USD,
-  buildOnrampUrl,
-  getUsdcBalanceOnBase,
-} from "@/lib/coinbase-onramp";
+
+const PLAN_PRICE_USD = 15;
 
 function formatRenews(iso: string | null): string {
   if (!iso) return "—";
@@ -25,10 +23,10 @@ function formatRenews(iso: string | null): string {
 }
 
 export default function BillingPage() {
-  const { apiFetch, wallet } = useDashboardAuth();
+  const { apiFetch } = useDashboardAuth();
+  const search = useSearchParams();
   const [me, setMe] = useState<Me | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,30 +42,30 @@ export default function BillingPage() {
       ]);
       setMe(user);
       setInvoices(list);
-      const checkAddress = user.wallet_address ?? wallet ?? null;
-      if (checkAddress) {
-        getUsdcBalanceOnBase(checkAddress).then(setBalance).catch(() => setBalance(0));
-      } else {
-        setBalance(null);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load billing");
     } finally {
       setLoading(false);
     }
-  }, [apiFetch, wallet]);
+  }, [apiFetch]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  const handlePayWithWallet = async () => {
+  useEffect(() => {
+    if (search.get("checkout") === "done") {
+      setNotice("Payment received by MoonPay. USDC arrives in ~1-3 minutes.");
+    }
+  }, [search]);
+
+  const handlePay = async () => {
     setBusy(true);
     setError(null);
     try {
       const { hosted_url } = await startCheckout(apiFetch);
       window.open(hosted_url, "_blank", "noopener,noreferrer");
-      setNotice("Charge opened in a new tab. Refresh after paying.");
+      setNotice("MoonPay opened in a new tab. Refresh after paying.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed");
     } finally {
@@ -75,21 +73,8 @@ export default function BillingPage() {
     }
   };
 
-  const handleTopUp = () => {
-    const address = me?.wallet_address ?? wallet;
-    if (!address) {
-      setError("Connect a wallet first.");
-      return;
-    }
-    const url = buildOnrampUrl({ walletAddress: address, amountUsd: PLAN_PRICE_USD });
-    window.open(url, "_blank", "noopener,noreferrer");
-    setNotice("Onramp opened. After USDC arrives on Base, click ‘Pay $15 with wallet’.");
-  };
-
   const planStatus = me?.plan_status ?? "free";
   const renews = me?.plan_renews_at ?? null;
-  const hasBalance = (balance ?? 0) >= PLAN_PRICE_USD;
-  const hasWallet = !!(me?.wallet_address ?? wallet);
 
   return (
     <div className="flex flex-col gap-8">
@@ -102,9 +87,9 @@ export default function BillingPage() {
             $15 / month.
           </h2>
           <p className="mt-5 max-w-2xl text-sm leading-relaxed text-[var(--color-ink)]/65">
-            Pay one month at a time in USDC on Base. No card on file, no
-            recurring charge. If you don&apos;t have USDC yet, top up with Apple
-            Pay or card via Coinbase Onramp first.
+            Pay with Apple Pay, credit card, or your own crypto. MoonPay handles
+            the checkout on their hosted page; you get 30 days of agent vision
+            once the USDC settles on Base. No card on file, no recurring charge.
           </p>
           <div className="mt-6 flex flex-wrap gap-x-8 gap-y-3 text-sm">
             <span className="text-[var(--color-ink)]/55">
@@ -114,12 +99,6 @@ export default function BillingPage() {
             <span className="text-[var(--color-ink)]/55">
               Renews:{" "}
               <span className="text-[var(--color-ink)]">{formatRenews(renews)}</span>
-            </span>
-            <span className="text-[var(--color-ink)]/55">
-              USDC on Base:{" "}
-              <span className="text-[var(--color-ink)]">
-                {balance === null ? (hasWallet ? "…" : "no wallet") : `${balance.toFixed(2)} USDC`}
-              </span>
             </span>
           </div>
         </div>
@@ -137,29 +116,16 @@ export default function BillingPage() {
             30 days of agent vision per charge.
           </p>
 
-          {!hasWallet ? (
-            <p className="mt-6 rounded-2xl border border-[var(--color-ink)]/15 bg-[var(--color-canvas)] px-4 py-3 text-xs text-[var(--color-ink)]/65">
-              Link a wallet on the Account page to pay or top up.
-            </p>
-          ) : hasBalance ? (
-            <Button className="mt-8 w-full" onClick={handlePayWithWallet} disabled={busy}>
-              {busy ? "Opening…" : `Pay $${PLAN_PRICE_USD} with wallet`}
-              <ExternalLink size={16} />
-            </Button>
-          ) : (
-            <div className="mt-8 flex flex-col gap-2">
-              <Button onClick={handleTopUp}>
-                Top up with Apple Pay or card
-                <ExternalLink size={16} />
-              </Button>
-              <Button variant="ghost" onClick={refresh}>
-                <RefreshCcw size={14} /> I&apos;ve topped up — recheck balance
-              </Button>
-            </div>
-          )}
+          <Button className="mt-8 w-full" onClick={handlePay} disabled={busy}>
+            {busy ? "Opening…" : `Pay $${PLAN_PRICE_USD}`}
+            <ExternalLink size={16} />
+          </Button>
+          <p className="mt-3 text-center text-[11px] uppercase tracking-[0.22em] text-[var(--color-ink)]/45">
+            Apple Pay · Card · Crypto
+          </p>
 
           {notice ? (
-            <p className="mt-3 text-center text-xs uppercase tracking-[0.2em] text-[var(--color-ink)]/55">
+            <p className="mt-4 text-center text-xs text-[var(--color-ink)]/65">
               {notice}
             </p>
           ) : null}
@@ -188,8 +154,8 @@ export default function BillingPage() {
           <p className="py-8 text-center text-sm text-[var(--color-ink)]/55">Loading…</p>
         ) : invoices.length === 0 ? (
           <EmptyState title="No payments yet">
-            Your first invoice appears here once a Coinbase Commerce charge
-            confirms on-chain.
+            Your first invoice appears here once MoonPay confirms the USDC has
+            landed on Base. Usually 1-3 minutes.
           </EmptyState>
         ) : (
           <Table
