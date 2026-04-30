@@ -205,8 +205,12 @@ export default function BillingPage() {
               <p>{intentError}</p>
             </div>
           ) : (
-            <>
-              <div ref={containerRef} id={`helio-${containerId}`} className="min-h-[420px]" />
+            <div className="flex flex-col items-center">
+              <div
+                ref={containerRef}
+                id={`helio-${containerId}`}
+                className="flex min-h-[420px] w-full justify-center [&>*]:mx-auto"
+              />
               {!widgetReady ? (
                 <p className="mt-3 text-center text-xs text-[var(--color-ink)]/45">
                   Loading checkout…
@@ -217,7 +221,7 @@ export default function BillingPage() {
                   {notice}
                 </p>
               ) : null}
-            </>
+            </div>
           )}
         </div>
       </Card>
