@@ -143,7 +143,7 @@ export default function BillingPage() {
     };
   }, [apiFetch, mockMode, refresh, scriptReady]);
 
-  const planStatus = me?.plan_status ?? "free";
+  const planStatus = me?.plan_status ?? "trial";
   const renews = me?.plan_renews_at ?? null;
 
   return (

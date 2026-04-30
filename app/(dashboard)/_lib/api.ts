@@ -1,11 +1,14 @@
+export type PlanStatus = "trial" | "paid" | "expired";
+
 export type Me = {
   id: string;
   privy_id: string;
   email: string | null;
   wallet_address: string | null;
   display_name: string | null;
-  plan_status: "free" | "paid";
+  plan_status: PlanStatus;
   plan_renews_at: string | null;
+  trial_ends_at: string | null;
   created_at: string;
   last_seen_at: string;
 };

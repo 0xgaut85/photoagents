@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AuthError, requireUser } from "@/lib/auth";
+import { AuthError, effectivePlanStatus, requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,7 +7,13 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const user = await requireUser(req);
-    return NextResponse.json({ user });
+    const effective = effectivePlanStatus(user);
+    return NextResponse.json({
+      user: {
+        ...user,
+        plan_status: effective,
+      },
+    });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: 401 });

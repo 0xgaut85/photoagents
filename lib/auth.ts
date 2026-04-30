@@ -1,14 +1,17 @@
 import { PrivyClient } from "@privy-io/server-auth";
 import { query } from "./db";
 
+export type PlanStatus = "trial" | "paid" | "expired";
+
 export type AppUser = {
   id: string;
   privy_id: string;
   email: string | null;
   wallet_address: string | null;
   display_name: string | null;
-  plan_status: "free" | "paid";
+  plan_status: PlanStatus;
   plan_renews_at: string | null;
+  trial_ends_at: string | null;
   created_at: string;
   last_seen_at: string;
 };
@@ -53,6 +56,8 @@ export async function upsertUser(privyId: string): Promise<AppUser> {
   const displayName =
     fresh.google?.name ?? fresh.twitter?.username ?? fresh.email?.address ?? null;
 
+  // INSERT seeds trial_ends_at via the column DEFAULT. UPDATE leaves it alone
+  // so an existing user keeps their original 24h window (or paid renewal).
   const { rows } = await query<AppUser>(
     `INSERT INTO users (privy_id, email, wallet_address, display_name)
        VALUES ($1, $2, $3, $4)
@@ -66,4 +71,23 @@ export async function upsertUser(privyId: string): Promise<AppUser> {
   );
 
   return rows[0];
+}
+
+/**
+ * Compute the effective plan status from raw DB columns. The DB column
+ * `plan_status` lags behind real-world expiration (we don't run a cron),
+ * so anything user-facing should call this instead of trusting the column.
+ */
+export function effectivePlanStatus(user: {
+  plan_renews_at: string | null;
+  trial_ends_at: string | null;
+}): PlanStatus {
+  const now = Date.now();
+  if (user.plan_renews_at && new Date(user.plan_renews_at).getTime() > now) {
+    return "paid";
+  }
+  if (user.trial_ends_at && new Date(user.trial_ends_at).getTime() > now) {
+    return "trial";
+  }
+  return "expired";
 }

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, KeyRound, Sparkles, Wallet } from "lucide-react";
 import { useDashboardAuth } from "../_components/DashboardAuth";
 import { Card, EmptyState } from "../_components/ui";
-import { fetchKeys, fetchMe, type ApiKey, type Me } from "../_lib/api";
+import { fetchKeys, fetchMe, type ApiKey, type Me, type PlanStatus } from "../_lib/api";
 
 function formatRenews(iso: string | null) {
   if (!iso) return null;
@@ -15,6 +15,22 @@ function formatRenews(iso: string | null) {
     date: date.toLocaleDateString(undefined, { month: "short", day: "2-digit", year: "numeric" }),
     days,
   };
+}
+
+function formatTrialRemaining(iso: string | null): string | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return null;
+  const hours = Math.floor(ms / 3_600_000);
+  const minutes = Math.floor((ms % 3_600_000) / 60_000);
+  if (hours >= 1) return `${hours}h ${minutes}m left`;
+  return `${minutes}m left`;
+}
+
+function planLabel(status: PlanStatus): string {
+  if (status === "paid") return "$15/mo";
+  if (status === "trial") return "Trial";
+  return "Expired";
 }
 
 export default function DashboardPage() {
@@ -40,20 +56,42 @@ export default function DashboardPage() {
     };
   }, [apiFetch]);
 
-  const planStatus = me?.plan_status ?? "free";
+  const planStatus: PlanStatus = me?.plan_status ?? "trial";
   const renews = formatRenews(me?.plan_renews_at ?? null);
+  const trialRemaining = formatTrialRemaining(me?.trial_ends_at ?? null);
   const activeKeys = keys.filter((k) => k.status === "active").length;
 
   return (
     <div className="flex flex-col gap-8">
-      {!loading && planStatus === "free" ? (
+      {!loading && planStatus === "trial" ? (
         <Card className="flex flex-col gap-4 border-amber-300/60 bg-amber-50/80 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-amber-700">
-              No active plan
+              Free 24-hour trial
             </p>
             <p className="mt-2 text-base font-light text-amber-900">
-              You&apos;re on the free tier. Pay $15 to unlock 30 days of agent vision.
+              {trialRemaining
+                ? `${trialRemaining} in your trial. Pay $15 to keep going for 30 more days.`
+                : "Your trial is ending soon. Pay $15 to keep going for 30 days."}
+            </p>
+          </div>
+          <Link
+            href="/dashboard/billing"
+            className="inline-flex items-center gap-2 self-start rounded-full bg-[var(--color-ink)] px-5 py-2.5 text-sm text-[var(--color-canvas)] transition-opacity hover:opacity-90 md:self-auto"
+          >
+            Pay $15 <ArrowRight size={15} />
+          </Link>
+        </Card>
+      ) : null}
+
+      {!loading && planStatus === "expired" ? (
+        <Card className="flex flex-col gap-4 border-red-300/60 bg-red-50/80 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-red-700">
+              Trial expired
+            </p>
+            <p className="mt-2 text-base font-light text-red-900">
+              Your 24-hour trial is over. Pay $15 to unlock 30 days of agent vision.
             </p>
           </div>
           <Link
@@ -130,7 +168,7 @@ export default function DashboardPage() {
               <div className="flex items-end justify-between gap-4 border-b border-[var(--color-ink)]/10 pb-4">
                 <dt className="text-sm text-[var(--color-ink)]/65">Plan</dt>
                 <dd className="text-3xl font-extralight tracking-[-0.04em]">
-                  {loading ? "—" : planStatus === "paid" ? "$15/mo" : "Free"}
+                  {loading ? "—" : planLabel(planStatus)}
                 </dd>
               </div>
               <div className="flex items-end justify-between gap-4">

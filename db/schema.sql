@@ -9,11 +9,20 @@ CREATE TABLE IF NOT EXISTS users (
   email           text,
   wallet_address  text,
   display_name    text,
-  plan_status     text NOT NULL DEFAULT 'free',
+  plan_status     text NOT NULL DEFAULT 'trial',
   plan_renews_at  timestamptz,
+  trial_ends_at   timestamptz NOT NULL DEFAULT (now() + interval '24 hours'),
   created_at      timestamptz NOT NULL DEFAULT now(),
   last_seen_at    timestamptz NOT NULL DEFAULT now()
 );
+
+-- Idempotent migration for existing databases that pre-date trial_ends_at.
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS trial_ends_at timestamptz NOT NULL DEFAULT (now() + interval '24 hours');
+
+-- Migrate any legacy 'free' rows to 'trial' so the new effective-status logic
+-- treats them consistently. (No-op on fresh databases.)
+UPDATE users SET plan_status = 'trial' WHERE plan_status = 'free';
 
 CREATE TABLE IF NOT EXISTS payments (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),

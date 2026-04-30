@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useDashboardAuth } from "./DashboardAuth";
+import { fetchMe } from "../_lib/api";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -32,15 +33,36 @@ export default function DashboardShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { ready, authenticated, label, initial, logout } = useDashboardAuth();
+  const { ready, authenticated, label, initial, logout, apiFetch, mockMode } = useDashboardAuth();
   const [open, setOpen] = useState(false);
   const isLogin = pathname === "/dashboard/login";
+  const isBilling = pathname.startsWith("/dashboard/billing");
 
   useEffect(() => {
     if (ready && !authenticated && !isLogin) {
       router.replace("/dashboard/login");
     }
   }, [authenticated, isLogin, ready, router]);
+
+  // Paywall: send expired users to /dashboard/billing on every other route.
+  // Trial and paid users are unaffected. Skipped in mockMode (no real API).
+  useEffect(() => {
+    if (mockMode) return;
+    if (!ready || !authenticated) return;
+    if (isLogin || isBilling) return;
+    let cancelled = false;
+    fetchMe(apiFetch)
+      .then((me) => {
+        if (cancelled) return;
+        if (me.plan_status === "expired") {
+          router.replace("/dashboard/billing");
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [apiFetch, authenticated, isBilling, isLogin, mockMode, pathname, ready, router]);
 
   useEffect(() => {
     setOpen(false);
