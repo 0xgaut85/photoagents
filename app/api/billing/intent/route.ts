@@ -2,24 +2,20 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { AuthError, requireUser } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { PLAN_PRICE_USD, createCharge } from "@/lib/helio";
+import { PLAN_PRICE_USD } from "@/lib/helio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * Mint a fresh externalPaymentId for the Helio embed widget. The browser
+ * passes this id back to Helio via `additionalJSON.externalPaymentId`, and
+ * the webhook uses it to match the confirmed payment to this DB row.
+ */
 export async function POST(req: Request) {
   try {
     const user = await requireUser(req);
     const externalPaymentId = randomUUID();
-
-    const origin = req.headers.get("origin") ?? new URL(req.url).origin;
-    const redirectUrl = `${origin}/dashboard/billing?checkout=done`;
-
-    const charge = await createCharge({
-      externalPaymentId,
-      email: user.email,
-      redirectUrl,
-    });
 
     await query(
       `INSERT INTO payments (user_id, provider, provider_charge_id, amount_usd, status)
@@ -29,15 +25,15 @@ export async function POST(req: Request) {
     );
 
     return NextResponse.json({
-      hosted_url: charge.pageUrl,
-      charge_id: externalPaymentId,
-      helio_charge_id: charge.id,
+      external_payment_id: externalPaymentId,
+      amount_usd: PLAN_PRICE_USD,
+      email: user.email,
     });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: 401 });
     }
-    console.error("/api/billing/checkout error:", error);
+    console.error("/api/billing/intent error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal error" },
       { status: 500 },

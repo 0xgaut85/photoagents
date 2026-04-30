@@ -1,19 +1,44 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { CreditCard, ExternalLink, RefreshCcw } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import Script from "next/script";
+import { CreditCard, RefreshCcw } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Table } from "../../_components/ui";
 import { useDashboardAuth } from "../../_components/DashboardAuth";
 import {
+  createPaymentIntent,
   fetchInvoices,
   fetchMe,
-  startCheckout,
   type Invoice,
   type Me,
 } from "../../_lib/api";
 
 const PLAN_PRICE_USD = 15;
+const PAYLINK_ID = process.env.NEXT_PUBLIC_HELIO_PAYLINK_ID ?? "";
+
+declare global {
+  interface Window {
+    helioCheckout?: (
+      container: HTMLElement,
+      config: HelioConfig,
+    ) => void;
+  }
+}
+
+type HelioConfig = {
+  paylinkId: string;
+  theme?: { themeMode?: "light" | "dark" };
+  primaryColor?: string;
+  neutralColor?: string;
+  display?: "inline" | "modal";
+  additionalJSON?: string;
+  customerDetails?: { email?: string };
+  onSuccess?: (event: unknown) => void;
+  onError?: (event: unknown) => void;
+  onPending?: (event: unknown) => void;
+  onCancel?: () => void;
+  onStartPayment?: () => void;
+};
 
 function formatRenews(iso: string | null): string {
   if (!iso) return "—";
@@ -23,14 +48,19 @@ function formatRenews(iso: string | null): string {
 }
 
 export default function BillingPage() {
-  const { apiFetch } = useDashboardAuth();
-  const search = useSearchParams();
+  const { apiFetch, mockMode } = useDashboardAuth();
+  const containerId = useId().replace(/:/g, "_");
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const initializedRef = useRef(false);
+
   const [me, setMe] = useState<Me | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [scriptReady, setScriptReady] = useState(false);
+  const [widgetReady, setWidgetReady] = useState(false);
+  const [intentError, setIntentError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -53,32 +83,82 @@ export default function BillingPage() {
     refresh();
   }, [refresh]);
 
+  // Mount the Helio embed widget once the script + container are both ready.
   useEffect(() => {
-    if (search.get("checkout") === "done") {
-      setNotice("Payment received by Helio. USDC arrives in ~1-3 minutes.");
+    if (mockMode) return;
+    if (!scriptReady) return;
+    if (!containerRef.current) return;
+    if (initializedRef.current) return;
+    if (!PAYLINK_ID) {
+      setIntentError("NEXT_PUBLIC_HELIO_PAYLINK_ID is not set");
+      return;
     }
-  }, [search]);
+    if (typeof window.helioCheckout !== "function") return;
 
-  const handlePay = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const { hosted_url } = await startCheckout(apiFetch);
-      window.open(hosted_url, "_blank", "noopener,noreferrer");
-      setNotice("Helio opened in a new tab. Refresh after paying.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Checkout failed");
-    } finally {
-      setBusy(false);
-    }
-  };
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const intent = await createPaymentIntent(apiFetch);
+        if (cancelled) return;
+
+        const container = containerRef.current;
+        if (!container) return;
+
+        window.helioCheckout!(container, {
+          paylinkId: PAYLINK_ID,
+          theme: { themeMode: "light" },
+          primaryColor: "#141714",
+          neutralColor: "#BEBDBB",
+          display: "inline",
+          additionalJSON: JSON.stringify({
+            externalPaymentId: intent.external_payment_id,
+          }),
+          ...(intent.email ? { customerDetails: { email: intent.email } } : {}),
+          onStartPayment: () => setNotice("Payment started…"),
+          onPending: () => setNotice("Payment pending — waiting for confirmation."),
+          onSuccess: () => {
+            setNotice("Payment confirmed. Refreshing your plan…");
+            setTimeout(() => {
+              refresh();
+            }, 1500);
+          },
+          onError: (event) => {
+            console.error("Helio onError", event);
+            setNotice("Payment failed. You can try again.");
+          },
+          onCancel: () => setNotice("Payment cancelled."),
+        });
+
+        initializedRef.current = true;
+        setWidgetReady(true);
+      } catch (err) {
+        if (cancelled) return;
+        setIntentError(err instanceof Error ? err.message : "Could not start checkout");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiFetch, mockMode, refresh, scriptReady]);
 
   const planStatus = me?.plan_status ?? "free";
   const renews = me?.plan_renews_at ?? null;
 
   return (
     <div className="flex flex-col gap-8">
-      <Card className="grid gap-8 lg:grid-cols-[1fr_0.8fr]">
+      {!mockMode ? (
+        <Script
+          src="https://embed.hel.io/assets/index-v1.js"
+          type="module"
+          strategy="afterInteractive"
+          onReady={() => setScriptReady(true)}
+          onLoad={() => setScriptReady(true)}
+        />
+      ) : null}
+
+      <Card className="grid gap-8 lg:grid-cols-[1fr_0.9fr]">
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-[var(--color-ink)]/55">
             Billing
@@ -88,8 +168,8 @@ export default function BillingPage() {
           </h2>
           <p className="mt-5 max-w-2xl text-sm leading-relaxed text-[var(--color-ink)]/65">
             Pay with Apple Pay, credit card, or your own crypto. Helio handles
-            the checkout on their hosted page; you get 30 days of agent vision
-            once the USDC settles on Base. No card on file, no recurring charge.
+            the checkout inline below; you get 30 days of agent vision once the
+            USDC settles on Base. No card on file, no recurring charge.
           </p>
           <div className="mt-6 flex flex-wrap gap-x-8 gap-y-3 text-sm">
             <span className="text-[var(--color-ink)]/55">
@@ -101,34 +181,44 @@ export default function BillingPage() {
               <span className="text-[var(--color-ink)]">{formatRenews(renews)}</span>
             </span>
           </div>
+          <div className="mt-8 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-ink)] text-[var(--color-canvas)]">
+              <CreditCard size={18} strokeWidth={1.5} />
+            </div>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--color-ink)]/45">
+              Apple Pay · Card · Crypto
+            </p>
+          </div>
         </div>
 
-        <div className="rounded-[1.75rem] border border-[var(--color-ink)]/15 bg-[var(--color-paper)]/30 p-6">
-          <div className="mb-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-ink)] text-[var(--color-canvas)]">
-            <CreditCard size={22} strokeWidth={1.5} />
-          </div>
-          <p className="text-sm text-[var(--color-ink)]/55">Photo API</p>
-          <p className="mt-2 text-6xl font-extralight tracking-[-0.07em]">
-            ${PLAN_PRICE_USD}
-            <span className="text-2xl text-[var(--color-ink)]/55">/mo</span>
-          </p>
-          <p className="mt-3 text-sm text-[var(--color-ink)]/55">
-            30 days of agent vision per charge.
-          </p>
-
-          <Button className="mt-8 w-full" onClick={handlePay} disabled={busy}>
-            {busy ? "Opening…" : `Pay $${PLAN_PRICE_USD}`}
-            <ExternalLink size={16} />
-          </Button>
-          <p className="mt-3 text-center text-[11px] uppercase tracking-[0.22em] text-[var(--color-ink)]/45">
-            Apple Pay · Card · Crypto
-          </p>
-
-          {notice ? (
-            <p className="mt-4 text-center text-xs text-[var(--color-ink)]/65">
-              {notice}
-            </p>
-          ) : null}
+        <div className="rounded-[1.75rem] border border-[var(--color-ink)]/15 bg-[var(--color-paper)]/30 p-4 sm:p-6">
+          {mockMode ? (
+            <div className="flex h-[420px] flex-col items-center justify-center text-center text-sm text-[var(--color-ink)]/55">
+              <p>Checkout disabled in mock mode.</p>
+              <p className="mt-2 text-xs">
+                Set <code>NEXT_PUBLIC_PRIVY_APP_ID</code> +{" "}
+                <code>NEXT_PUBLIC_HELIO_PAYLINK_ID</code> to enable Helio.
+              </p>
+            </div>
+          ) : intentError ? (
+            <div className="flex h-[420px] flex-col items-center justify-center text-center text-sm text-red-700">
+              <p>{intentError}</p>
+            </div>
+          ) : (
+            <>
+              <div ref={containerRef} id={`helio-${containerId}`} className="min-h-[420px]" />
+              {!widgetReady ? (
+                <p className="mt-3 text-center text-xs text-[var(--color-ink)]/45">
+                  Loading checkout…
+                </p>
+              ) : null}
+              {notice ? (
+                <p className="mt-3 text-center text-xs text-[var(--color-ink)]/65">
+                  {notice}
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
       </Card>
 

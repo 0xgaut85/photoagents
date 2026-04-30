@@ -67,11 +67,15 @@ export async function revokeKey(apiFetch: Fetcher, id: string): Promise<ApiKey> 
   return toApiKey(key);
 }
 
-export async function startCheckout(
+export async function createPaymentIntent(
   apiFetch: Fetcher,
-): Promise<{ hosted_url: string; charge_id: string }> {
-  const res = await apiFetch("/api/billing/checkout", { method: "POST" });
-  return readJson<{ hosted_url: string; charge_id: string }>(res);
+): Promise<{ external_payment_id: string; amount_usd: number; email: string | null }> {
+  const res = await apiFetch("/api/billing/intent", { method: "POST" });
+  return readJson<{
+    external_payment_id: string;
+    amount_usd: number;
+    email: string | null;
+  }>(res);
 }
 
 export async function fetchInvoices(apiFetch: Fetcher): Promise<Invoice[]> {
