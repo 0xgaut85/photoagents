@@ -107,6 +107,7 @@ The longer you use it, the less it costs you and the more it can do.`,
   ctaSecondary: {
     label: "Get an API key",
     href: "/dashboard",
+    comingSoon: true,
   },
 } as const;
 
