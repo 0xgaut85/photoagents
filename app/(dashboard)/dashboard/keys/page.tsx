@@ -1,44 +1,93 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Card, Input, Modal, Table } from "../../_components/ui";
 import { type ApiKey, mockKeys } from "../../_lib/mock";
+import { createKey as apiCreateKey, fetchKeys, revokeKey as apiRevokeKey } from "../../_lib/api";
+import { useDashboardAuth } from "../../_components/DashboardAuth";
 
-function newSecret() {
+function newMockSecret() {
   return `pk_live_${crypto.randomUUID().replaceAll("-", "").slice(0, 28)}`;
 }
 
 export default function KeysPage() {
-  const [keys, setKeys] = useState<ApiKey[]>(mockKeys);
+  const { apiFetch, mockMode } = useDashboardAuth();
+  const [keys, setKeys] = useState<ApiKey[]>(mockMode ? mockKeys : []);
+  const [loading, setLoading] = useState(!mockMode);
+  const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [keyName, setKeyName] = useState("New production key");
   const [revealed, setRevealed] = useState("");
   const [copied, setCopied] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const refresh = useCallback(async () => {
+    if (mockMode) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const list = await fetchKeys(apiFetch);
+      setKeys(list);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load keys");
+    } finally {
+      setLoading(false);
+    }
+  }, [apiFetch, mockMode]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   const activeCount = useMemo(
     () => keys.filter((key) => key.status === "active").length,
     [keys],
   );
 
-  const createKey = () => {
-    const secret = newSecret();
-    const next: ApiKey = {
-      id: crypto.randomUUID(),
-      name: keyName || "Untitled key",
-      prefix: `${secret.slice(0, 8)}••••${secret.slice(-4)}`,
-      createdAt: "Today",
-      lastUsed: "Never",
-      status: "active",
-    };
-    setKeys((current) => [next, ...current]);
-    setRevealed(secret);
+  const handleCreate = async () => {
+    setError(null);
+    if (mockMode) {
+      const secret = newMockSecret();
+      const next: ApiKey = {
+        id: crypto.randomUUID(),
+        name: keyName || "Untitled key",
+        prefix: `${secret.slice(0, 8)}••••${secret.slice(-4)}`,
+        createdAt: "Today",
+        lastUsed: "Never",
+        status: "active",
+      };
+      setKeys((current) => [next, ...current]);
+      setRevealed(secret);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { key, secret } = await apiCreateKey(apiFetch, keyName || "Untitled key");
+      setKeys((current) => [key, ...current]);
+      setRevealed(secret);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create key");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const revokeKey = (id: string) => {
-    setKeys((current) =>
-      current.map((key) => (key.id === id ? { ...key, status: "revoked" } : key)),
-    );
+  const handleRevoke = async (id: string) => {
+    if (mockMode) {
+      setKeys((current) =>
+        current.map((key) => (key.id === id ? { ...key, status: "revoked" } : key)),
+      );
+      return;
+    }
+    setError(null);
+    try {
+      const updated = await apiRevokeKey(apiFetch, id);
+      setKeys((current) => current.map((key) => (key.id === id ? updated : key)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to revoke key");
+    }
   };
 
   const copyText = async (text: string) => {
@@ -58,8 +107,9 @@ export default function KeysPage() {
             Create the eyes.
           </h2>
           <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[var(--color-muted)]">
-            Keys are mocked locally for now. The one-time reveal pattern is here
-            so the real backend can drop in without changing the UX.
+            {mockMode
+              ? "Local mock mode — keys never leave the browser. Set NEXT_PUBLIC_PRIVY_APP_ID to switch to the real backend."
+              : "Each key is shown exactly once. Store it somewhere safe; we only keep a hash."}
           </p>
         </div>
         <Button onClick={() => setOpen(true)}>
@@ -67,47 +117,59 @@ export default function KeysPage() {
         </Button>
       </Card>
 
+      {error ? (
+        <Card className="border-red-200 bg-red-50 text-sm text-red-700">{error}</Card>
+      ) : null}
+
       <section className="grid gap-4 md:grid-cols-3">
         <Card>
           <p className="text-sm text-[var(--color-muted)]">Active keys</p>
           <p className="mt-3 text-4xl font-extralight">{activeCount}</p>
         </Card>
         <Card>
-          <p className="text-sm text-[var(--color-muted)]">Last used</p>
-          <p className="mt-3 text-4xl font-extralight">2m ago</p>
+          <p className="text-sm text-[var(--color-muted)]">Total keys</p>
+          <p className="mt-3 text-4xl font-extralight">{keys.length}</p>
         </Card>
         <Card>
           <p className="text-sm text-[var(--color-muted)]">Mode</p>
-          <p className="mt-3 text-4xl font-extralight">Live</p>
+          <p className="mt-3 text-4xl font-extralight">{mockMode ? "Mock" : "Live"}</p>
         </Card>
       </section>
 
       <Card>
-        <Table
-          headers={["Name", "Key", "Created", "Last used", "Status", ""]}
-          rows={keys.map((key) => [
-            <span key="name" className="font-normal">
-              {key.name}
-            </span>,
-            <code key="prefix" className="rounded-full bg-[var(--color-line)] px-3 py-1 text-xs">
-              {key.prefix}
-            </code>,
-            key.createdAt,
-            key.lastUsed,
-            <Badge key="status" tone={key.status === "active" ? "success" : "danger"}>
-              {key.status}
-            </Badge>,
-            key.status === "active" ? (
-              <Button key="revoke" variant="ghost" onClick={() => revokeKey(key.id)}>
-                <Trash2 size={15} /> Revoke
-              </Button>
-            ) : (
-              <span key="empty" className="text-[var(--color-muted)]">
-                -
-              </span>
-            ),
-          ])}
-        />
+        {loading ? (
+          <p className="py-12 text-center text-sm text-[var(--color-muted)]">Loading keys…</p>
+        ) : keys.length === 0 ? (
+          <p className="py-12 text-center text-sm text-[var(--color-muted)]">
+            No keys yet. Create one to start hitting the API.
+          </p>
+        ) : (
+          <Table
+            headers={["Name", "Key", "Created", "Last used", "Status", ""]}
+            rows={keys.map((key) => [
+              <span key="name" className="font-normal">
+                {key.name}
+              </span>,
+              <code key="prefix" className="rounded-full bg-[var(--color-line)] px-3 py-1 text-xs">
+                {key.prefix}
+              </code>,
+              key.createdAt,
+              key.lastUsed,
+              <Badge key="status" tone={key.status === "active" ? "success" : "danger"}>
+                {key.status}
+              </Badge>,
+              key.status === "active" ? (
+                <Button key="revoke" variant="ghost" onClick={() => handleRevoke(key.id)}>
+                  <Trash2 size={15} /> Revoke
+                </Button>
+              ) : (
+                <span key="empty" className="text-[var(--color-muted)]">
+                  -
+                </span>
+              ),
+            ])}
+          />
+        )}
       </Card>
 
       <Modal
@@ -140,8 +202,8 @@ export default function KeysPage() {
                 onChange={(event) => setKeyName(event.target.value)}
               />
             </label>
-            <Button onClick={createKey}>
-              <KeyRound size={16} /> Generate key
+            <Button onClick={handleCreate} disabled={submitting}>
+              <KeyRound size={16} /> {submitting ? "Generating…" : "Generate key"}
             </Button>
           </div>
         )}

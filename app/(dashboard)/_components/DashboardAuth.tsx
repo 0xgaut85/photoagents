@@ -2,12 +2,13 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
+import { PrivyProvider, getAccessToken, usePrivy } from "@privy-io/react-auth";
 
 type DashboardAuth = {
   ready: boolean;
@@ -15,10 +16,13 @@ type DashboardAuth = {
   label: string;
   initial: string;
   wallet?: string;
+  mockMode: boolean;
   login: () => void;
   logout: () => void;
   linkGoogle: () => void;
   linkWallet: () => void;
+  /** Fetch wrapper that automatically attaches the Privy access token. */
+  apiFetch: (input: string, init?: RequestInit) => Promise<Response>;
 };
 
 const AuthContext = createContext<DashboardAuth | null>(null);
@@ -44,6 +48,16 @@ function PrivyBridge({ children }: { children: ReactNode }) {
     user?.email?.address ||
     (wallet ? truncateAddress(wallet) : "Photo builder");
 
+  const apiFetch = useCallback<DashboardAuth["apiFetch"]>(async (input, init) => {
+    const token = await getAccessToken();
+    const headers = new Headers(init?.headers);
+    if (token) headers.set("authorization", `Bearer ${token}`);
+    if (!headers.has("content-type") && init?.body) {
+      headers.set("content-type", "application/json");
+    }
+    return fetch(input, { ...init, headers });
+  }, []);
+
   const value = useMemo<DashboardAuth>(
     () => ({
       ready,
@@ -51,12 +65,14 @@ function PrivyBridge({ children }: { children: ReactNode }) {
       label,
       initial: label.slice(0, 1).toUpperCase(),
       wallet,
+      mockMode: false,
       login: () => login(),
       logout: () => void logout(),
       linkGoogle: () => linkGoogle(),
       linkWallet: () => linkWallet(),
+      apiFetch,
     }),
-    [authenticated, label, linkGoogle, linkWallet, login, logout, ready, wallet],
+    [apiFetch, authenticated, label, linkGoogle, linkWallet, login, logout, ready, wallet],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -67,6 +83,13 @@ function MockAuthProvider({ children }: { children: ReactNode }) {
   const label = "demo@photoagents.ai";
   const wallet = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
 
+  const apiFetch = useCallback<DashboardAuth["apiFetch"]>(async () => {
+    return new Response(JSON.stringify({ error: "Mock auth: API disabled" }), {
+      status: 503,
+      headers: { "content-type": "application/json" },
+    });
+  }, []);
+
   const value = useMemo<DashboardAuth>(
     () => ({
       ready: true,
@@ -74,12 +97,14 @@ function MockAuthProvider({ children }: { children: ReactNode }) {
       label,
       initial: "D",
       wallet,
+      mockMode: true,
       login: () => setAuthenticated(true),
       logout: () => setAuthenticated(false),
       linkGoogle: () => setAuthenticated(true),
       linkWallet: () => setAuthenticated(true),
+      apiFetch,
     }),
-    [authenticated],
+    [apiFetch, authenticated],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
