@@ -55,7 +55,7 @@ export default function BillingPage() {
 
   useEffect(() => {
     if (search.get("checkout") === "done") {
-      setNotice("Payment received by MoonPay. USDC arrives in ~1-3 minutes.");
+      setNotice("Payment received by Helio. USDC arrives in ~1-3 minutes.");
     }
   }, [search]);
 
@@ -65,7 +65,7 @@ export default function BillingPage() {
     try {
       const { hosted_url } = await startCheckout(apiFetch);
       window.open(hosted_url, "_blank", "noopener,noreferrer");
-      setNotice("MoonPay opened in a new tab. Refresh after paying.");
+      setNotice("Helio opened in a new tab. Refresh after paying.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed");
     } finally {
@@ -87,7 +87,7 @@ export default function BillingPage() {
             $15 / month.
           </h2>
           <p className="mt-5 max-w-2xl text-sm leading-relaxed text-[var(--color-ink)]/65">
-            Pay with Apple Pay, credit card, or your own crypto. MoonPay handles
+            Pay with Apple Pay, credit card, or your own crypto. Helio handles
             the checkout on their hosted page; you get 30 days of agent vision
             once the USDC settles on Base. No card on file, no recurring charge.
           </p>
@@ -154,7 +154,7 @@ export default function BillingPage() {
           <p className="py-8 text-center text-sm text-[var(--color-ink)]/55">Loading…</p>
         ) : invoices.length === 0 ? (
           <EmptyState title="No payments yet">
-            Your first invoice appears here once MoonPay confirms the USDC has
+            Your first invoice appears here once Helio confirms the USDC has
             landed on Base. Usually 1-3 minutes.
           </EmptyState>
         ) : (
