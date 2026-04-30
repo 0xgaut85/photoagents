@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ArrowRight, KeyRound, Sparkles, Wallet } from "lucide-react";
 import { useDashboardAuth } from "../_components/DashboardAuth";
-import UsageChart from "../_components/UsageChart";
-import { Card, Stat, Table } from "../_components/ui";
-import { mockEndpointUsage, mockKeys, mockUsageSeries, plan } from "../_lib/mock";
-import { fetchMe, type Me } from "../_lib/api";
+import { Card, EmptyState } from "../_components/ui";
+import { fetchKeys, fetchMe, type ApiKey, type Me } from "../_lib/api";
 
 function formatRenews(iso: string | null) {
   if (!iso) return null;
@@ -19,55 +18,66 @@ function formatRenews(iso: string | null) {
 }
 
 export default function DashboardPage() {
-  const { label, apiFetch, mockMode } = useDashboardAuth();
+  const { label, apiFetch } = useDashboardAuth();
   const [me, setMe] = useState<Me | null>(null);
+  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (mockMode) return;
-    fetchMe(apiFetch).then(setMe).catch(() => undefined);
-  }, [apiFetch, mockMode]);
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([
+      fetchMe(apiFetch).catch(() => null),
+      fetchKeys(apiFetch).catch(() => [] as ApiKey[]),
+    ]).then(([user, list]) => {
+      if (cancelled) return;
+      setMe(user);
+      setKeys(list);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiFetch]);
 
-  const lastSeven = mockUsageSeries.slice(-7);
-  const totalRequests = mockUsageSeries.reduce((sum, item) => sum + item.requests, 0);
-  const activeKeys = mockKeys.filter((key) => key.status === "active").length;
-
-  const planStatus = me?.plan_status ?? (mockMode ? "paid" : "free");
+  const planStatus = me?.plan_status ?? "free";
   const renews = formatRenews(me?.plan_renews_at ?? null);
+  const activeKeys = keys.filter((k) => k.status === "active").length;
 
   return (
     <div className="flex flex-col gap-8">
-      {!mockMode && planStatus === "free" ? (
-        <Card className="flex flex-col gap-3 border-amber-200 bg-amber-50 md:flex-row md:items-center md:justify-between">
+      {!loading && planStatus === "free" ? (
+        <Card className="flex flex-col gap-4 border-amber-300/60 bg-amber-50/80 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-amber-700">
               No active plan
             </p>
-            <p className="mt-1 text-base font-light text-amber-900">
+            <p className="mt-2 text-base font-light text-amber-900">
               You&apos;re on the free tier. Pay $15 to unlock 30 days of agent vision.
             </p>
           </div>
           <Link
             href="/dashboard/billing"
-            className="inline-flex items-center gap-2 rounded-full bg-[var(--color-ink)] px-5 py-2.5 text-sm text-[var(--color-canvas)] transition-opacity hover:opacity-90"
+            className="inline-flex items-center gap-2 self-start rounded-full bg-[var(--color-ink)] px-5 py-2.5 text-sm text-[var(--color-canvas)] transition-opacity hover:opacity-90 md:self-auto"
           >
-            Pay $15 →
+            Pay $15 <ArrowRight size={15} />
           </Link>
         </Card>
       ) : null}
 
-      {!mockMode && planStatus === "paid" && renews ? (
-        <Card className="flex flex-col gap-3 border-emerald-200 bg-emerald-50 md:flex-row md:items-center md:justify-between">
+      {!loading && planStatus === "paid" && renews ? (
+        <Card className="flex flex-col gap-4 border-emerald-300/60 bg-emerald-50/80 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-emerald-700">
               Plan active
             </p>
-            <p className="mt-1 text-base font-light text-emerald-900">
+            <p className="mt-2 text-base font-light text-emerald-900">
               Renews on {renews.date} ({renews.days} days left).
             </p>
           </div>
           <Link
             href="/dashboard/billing"
-            className="inline-flex items-center gap-2 rounded-full border border-emerald-700 px-5 py-2.5 text-sm text-emerald-900 transition-colors hover:bg-emerald-100"
+            className="inline-flex items-center gap-2 self-start rounded-full border border-emerald-700 px-5 py-2.5 text-sm text-emerald-900 transition-colors hover:bg-emerald-100 md:self-auto"
           >
             Renew early
           </Link>
@@ -75,80 +85,82 @@ export default function DashboardPage() {
       ) : null}
 
       <section className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
-        <Card className="min-h-72">
-          <p className="text-xs uppercase tracking-[0.28em] text-[var(--color-muted)]">
-            Welcome
-          </p>
-          <h2 className="mt-4 max-w-3xl text-5xl font-extralight tracking-[-0.06em] md:text-6xl">
-            {label} is ready to give your agent vision.
-          </h2>
-          <p className="mt-6 max-w-2xl text-base font-light leading-relaxed text-[var(--color-muted)]">
-            Create a key, send an image, watch the system learn from every
-            observation. Usage metering is mocked for now; keys and billing are live.
-          </p>
+        <Card className="flex min-h-72 flex-col justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.28em] text-[var(--color-ink)]/55">
+              Welcome
+            </p>
+            <h2 className="mt-4 max-w-3xl text-5xl font-extralight tracking-[-0.06em] md:text-6xl">
+              {label}
+            </h2>
+            <p className="mt-6 max-w-2xl text-base font-light leading-relaxed text-[var(--color-ink)]/65">
+              Create a key, send an image, watch the agent see. Three doors:
+              keys, billing, docs.
+            </p>
+          </div>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href="/dashboard/keys"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--color-ink)] px-5 py-3 text-sm text-[var(--color-canvas)] transition-opacity hover:opacity-90"
+            >
+              <KeyRound size={15} /> New API key
+            </Link>
+            <Link
+              href="/dashboard/docs"
+              className="inline-flex items-center gap-2 rounded-full border border-[var(--color-ink)]/20 px-5 py-3 text-sm transition-colors hover:border-[var(--color-ink)]"
+            >
+              <Sparkles size={15} /> Read the docs
+            </Link>
+          </div>
         </Card>
 
         <Card className="flex flex-col justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-[var(--color-muted)]">
-              This month
+            <p className="text-xs uppercase tracking-[0.28em] text-[var(--color-ink)]/55">
+              At a glance
             </p>
-            <p className="mt-4 text-6xl font-extralight tracking-[-0.07em]">
-              {Math.round((plan.used / plan.limit) * 100)}%
-            </p>
-            <p className="mt-3 text-sm text-[var(--color-muted)]">
-              {plan.used.toLocaleString()} of {plan.limit.toLocaleString()} requests used.
-            </p>
-          </div>
-          <div className="mt-8 h-2 overflow-hidden rounded-full bg-[var(--color-line)]">
-            <div
-              className="h-full rounded-full bg-[var(--color-ink)]"
-              style={{ width: `${(plan.used / plan.limit) * 100}%` }}
-            />
+            <dl className="mt-6 flex flex-col gap-5">
+              <div className="flex items-end justify-between gap-4 border-b border-[var(--color-ink)]/10 pb-4">
+                <dt className="text-sm text-[var(--color-ink)]/65">Active keys</dt>
+                <dd className="text-3xl font-extralight tracking-[-0.04em]">
+                  {loading ? "—" : activeKeys}
+                </dd>
+              </div>
+              <div className="flex items-end justify-between gap-4 border-b border-[var(--color-ink)]/10 pb-4">
+                <dt className="text-sm text-[var(--color-ink)]/65">Plan</dt>
+                <dd className="text-3xl font-extralight tracking-[-0.04em]">
+                  {loading ? "—" : planStatus === "paid" ? "$15/mo" : "Free"}
+                </dd>
+              </div>
+              <div className="flex items-end justify-between gap-4">
+                <dt className="text-sm text-[var(--color-ink)]/65">Wallet</dt>
+                <dd className="inline-flex items-center gap-2 text-sm font-light">
+                  <Wallet size={14} strokeWidth={1.5} />
+                  {me?.wallet_address
+                    ? `${me.wallet_address.slice(0, 6)}…${me.wallet_address.slice(-4)}`
+                    : "Not linked"}
+                </dd>
+              </div>
+            </dl>
           </div>
         </Card>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Stat label="Requests" value={totalRequests.toLocaleString()} detail="30-day mock volume" />
-        <Stat label="Active keys" value={String(activeKeys)} detail="Production + local" />
-        <Stat label="Plan" value={plan.price} detail="Photo API starter" />
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
-        <Card>
-          <div className="mb-6 flex items-end justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-[var(--color-muted)]">
-                Last 7 days
-              </p>
-              <h3 className="mt-2 text-3xl font-extralight tracking-[-0.04em]">
-                Usage is compounding
-              </h3>
-            </div>
-          </div>
-          <UsageChart data={lastSeven} compact />
-        </Card>
-
-        <Card>
-          <div className="mb-5">
-            <p className="text-xs uppercase tracking-[0.24em] text-[var(--color-muted)]">
-              Recent activity
-            </p>
-            <h3 className="mt-2 text-3xl font-extralight tracking-[-0.04em]">
-              Endpoint pulse
-            </h3>
-          </div>
-          <Table
-            headers={["Endpoint", "Requests", "Success"]}
-            rows={mockEndpointUsage.slice(0, 3).map((item) => [
-              item.endpoint,
-              item.requests.toLocaleString(),
-              item.success,
-            ])}
-          />
-        </Card>
-      </section>
+      <Card>
+        <p className="text-xs uppercase tracking-[0.24em] text-[var(--color-ink)]/55">
+          Usage
+        </p>
+        <h3 className="mt-2 text-3xl font-extralight tracking-[-0.04em]">
+          Metering arrives with the API
+        </h3>
+        <div className="mt-6">
+          <EmptyState title="Nothing to chart yet">
+            Per-request metering will land alongside the public <code>/v1</code>
+            endpoints. For now, your dashboard is wired up and waiting.
+          </EmptyState>
+        </div>
+      </Card>
     </div>
   );
 }

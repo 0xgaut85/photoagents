@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CreditCard, ExternalLink, RefreshCcw } from "lucide-react";
-import { Badge, Button, Card, Table } from "../../_components/ui";
-import { mockInvoices, plan } from "../../_lib/mock";
+import { Badge, Button, Card, EmptyState, Table } from "../../_components/ui";
 import { useDashboardAuth } from "../../_components/DashboardAuth";
 import {
   fetchInvoices,
   fetchMe,
   startCheckout,
+  type Invoice,
   type Me,
 } from "../../_lib/api";
 import {
@@ -16,8 +16,6 @@ import {
   buildOnrampUrl,
   getUsdcBalanceOnBase,
 } from "@/lib/coinbase-onramp";
-
-type Invoice = (typeof mockInvoices)[number];
 
 function formatRenews(iso: string | null): string {
   if (!iso) return "—";
@@ -27,17 +25,16 @@ function formatRenews(iso: string | null): string {
 }
 
 export default function BillingPage() {
-  const { apiFetch, mockMode, wallet } = useDashboardAuth();
+  const { apiFetch, wallet } = useDashboardAuth();
   const [me, setMe] = useState<Me | null>(null);
-  const [invoices, setInvoices] = useState<Invoice[]>(mockMode ? mockInvoices : []);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [balance, setBalance] = useState<number | null>(null);
-  const [loading, setLoading] = useState(!mockMode);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
 
   const refresh = useCallback(async () => {
-    if (mockMode) return;
     setLoading(true);
     setError(null);
     try {
@@ -50,24 +47,21 @@ export default function BillingPage() {
       const checkAddress = user.wallet_address ?? wallet ?? null;
       if (checkAddress) {
         getUsdcBalanceOnBase(checkAddress).then(setBalance).catch(() => setBalance(0));
+      } else {
+        setBalance(null);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load billing");
     } finally {
       setLoading(false);
     }
-  }, [apiFetch, mockMode, wallet]);
+  }, [apiFetch, wallet]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
   const handlePayWithWallet = async () => {
-    if (mockMode) {
-      setNotice("Coming soon");
-      setTimeout(() => setNotice(""), 1800);
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
@@ -95,55 +89,58 @@ export default function BillingPage() {
   const planStatus = me?.plan_status ?? "free";
   const renews = me?.plan_renews_at ?? null;
   const hasBalance = (balance ?? 0) >= PLAN_PRICE_USD;
+  const hasWallet = !!(me?.wallet_address ?? wallet);
 
   return (
     <div className="flex flex-col gap-8">
       <Card className="grid gap-8 lg:grid-cols-[1fr_0.8fr]">
         <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-[var(--color-muted)]">
+          <p className="text-xs uppercase tracking-[0.28em] text-[var(--color-ink)]/55">
             Billing
           </p>
           <h2 className="mt-4 text-5xl font-extralight tracking-[-0.06em]">
-            The $15/mo eyes plan.
+            $15 / month.
           </h2>
-          <p className="mt-5 max-w-2xl text-sm leading-relaxed text-[var(--color-muted)]">
-            One month at a time. Pay with USDC on Base — or top up first with Apple
-            Pay / card via Coinbase Onramp, then come back and pay.
+          <p className="mt-5 max-w-2xl text-sm leading-relaxed text-[var(--color-ink)]/65">
+            Pay one month at a time in USDC on Base. No card on file, no
+            recurring charge. If you don&apos;t have USDC yet, top up with Apple
+            Pay or card via Coinbase Onramp first.
           </p>
-          {!mockMode ? (
-            <div className="mt-6 flex flex-wrap gap-x-8 gap-y-2 text-sm">
-              <span className="text-[var(--color-muted)]">
-                Status:{" "}
-                <Badge tone={planStatus === "paid" ? "success" : "warning"}>{planStatus}</Badge>
+          <div className="mt-6 flex flex-wrap gap-x-8 gap-y-3 text-sm">
+            <span className="text-[var(--color-ink)]/55">
+              Status:{" "}
+              <Badge tone={planStatus === "paid" ? "success" : "warning"}>{planStatus}</Badge>
+            </span>
+            <span className="text-[var(--color-ink)]/55">
+              Renews:{" "}
+              <span className="text-[var(--color-ink)]">{formatRenews(renews)}</span>
+            </span>
+            <span className="text-[var(--color-ink)]/55">
+              USDC on Base:{" "}
+              <span className="text-[var(--color-ink)]">
+                {balance === null ? (hasWallet ? "…" : "no wallet") : `${balance.toFixed(2)} USDC`}
               </span>
-              <span className="text-[var(--color-muted)]">
-                Renews: <span className="text-[var(--color-ink)]">{formatRenews(renews)}</span>
-              </span>
-              <span className="text-[var(--color-muted)]">
-                USDC on Base:{" "}
-                <span className="text-[var(--color-ink)]">
-                  {balance === null ? "…" : `${balance.toFixed(2)} USDC`}
-                </span>
-              </span>
-            </div>
-          ) : null}
+            </span>
+          </div>
         </div>
-        <div className="rounded-[1.75rem] border border-[var(--color-line)] bg-white/70 p-6">
+
+        <div className="rounded-[1.75rem] border border-[var(--color-ink)]/15 bg-[var(--color-paper)]/30 p-6">
           <div className="mb-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-ink)] text-[var(--color-canvas)]">
             <CreditCard size={22} strokeWidth={1.5} />
           </div>
-          <p className="text-sm text-[var(--color-muted)]">{plan.name}</p>
+          <p className="text-sm text-[var(--color-ink)]/55">Photo API</p>
           <p className="mt-2 text-6xl font-extralight tracking-[-0.07em]">
-            {plan.price}
+            ${PLAN_PRICE_USD}
+            <span className="text-2xl text-[var(--color-ink)]/55">/mo</span>
           </p>
-          <p className="mt-3 text-sm text-[var(--color-muted)]">
-            {plan.limit.toLocaleString()} requests included for 30 days.
+          <p className="mt-3 text-sm text-[var(--color-ink)]/55">
+            30 days of agent vision per charge.
           </p>
 
-          {mockMode ? (
-            <Button className="mt-8 w-full" onClick={handlePayWithWallet}>
-              Manage payment
-            </Button>
+          {!hasWallet ? (
+            <p className="mt-6 rounded-2xl border border-[var(--color-ink)]/15 bg-[var(--color-canvas)] px-4 py-3 text-xs text-[var(--color-ink)]/65">
+              Link a wallet on the Account page to pay or top up.
+            </p>
           ) : hasBalance ? (
             <Button className="mt-8 w-full" onClick={handlePayWithWallet} disabled={busy}>
               {busy ? "Opening…" : `Pay $${PLAN_PRICE_USD} with wallet`}
@@ -151,8 +148,8 @@ export default function BillingPage() {
             </Button>
           ) : (
             <div className="mt-8 flex flex-col gap-2">
-              <Button onClick={handleTopUp} disabled={!wallet && !me?.wallet_address}>
-                Top up with Apple Pay or card (${PLAN_PRICE_USD})
+              <Button onClick={handleTopUp}>
+                Top up with Apple Pay or card
                 <ExternalLink size={16} />
               </Button>
               <Button variant="ghost" onClick={refresh}>
@@ -162,7 +159,7 @@ export default function BillingPage() {
           )}
 
           {notice ? (
-            <p className="mt-3 text-center text-xs uppercase tracking-[0.2em] text-[var(--color-muted)]">
+            <p className="mt-3 text-center text-xs uppercase tracking-[0.2em] text-[var(--color-ink)]/55">
               {notice}
             </p>
           ) : null}
@@ -176,25 +173,24 @@ export default function BillingPage() {
       <Card>
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-[var(--color-muted)]">
+            <p className="text-xs uppercase tracking-[0.24em] text-[var(--color-ink)]/55">
               Invoices
             </p>
             <h3 className="mt-2 text-3xl font-extralight tracking-[-0.04em]">
               Paper trail
             </h3>
           </div>
-          {!mockMode ? (
-            <Button variant="ghost" onClick={refresh} disabled={loading}>
-              <RefreshCcw size={14} /> Refresh
-            </Button>
-          ) : null}
+          <Button variant="ghost" onClick={refresh} disabled={loading}>
+            <RefreshCcw size={14} /> Refresh
+          </Button>
         </div>
         {loading ? (
-          <p className="py-8 text-center text-sm text-[var(--color-muted)]">Loading…</p>
+          <p className="py-8 text-center text-sm text-[var(--color-ink)]/55">Loading…</p>
         ) : invoices.length === 0 ? (
-          <p className="py-8 text-center text-sm text-[var(--color-muted)]">
-            No payments yet. Your first one will appear here once confirmed on-chain.
-          </p>
+          <EmptyState title="No payments yet">
+            Your first invoice appears here once a Coinbase Commerce charge
+            confirms on-chain.
+          </EmptyState>
         ) : (
           <Table
             headers={["Invoice", "Date", "Amount", "Status"]}

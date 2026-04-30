@@ -1,10 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  BarChart3,
   BookOpen,
   CreditCard,
   KeyRound,
@@ -19,9 +19,8 @@ import { useDashboardAuth } from "./DashboardAuth";
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/keys", label: "API keys", icon: KeyRound },
-  { href: "/dashboard/usage", label: "Usage", icon: BarChart3 },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
-  { href: "/dashboard/docs", label: "Docs / Playground", icon: BookOpen },
+  { href: "/dashboard/docs", label: "Docs", icon: BookOpen },
   { href: "/dashboard/team", label: "Team", icon: Users },
   { href: "/dashboard/account", label: "Account", icon: Settings },
 ];
@@ -53,8 +52,8 @@ export default function DashboardShell({
 
   if (!ready || !authenticated) {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-[var(--color-canvas)] text-[var(--color-ink)]">
-        <div className="text-sm font-light uppercase tracking-[0.25em] text-[var(--color-muted)]">
+      <main className="flex min-h-dvh items-center justify-center bg-[var(--color-paper)] text-[var(--color-ink)]">
+        <div className="text-sm font-light uppercase tracking-[0.25em] text-[var(--color-ink)]/60">
           Loading dashboard
         </div>
       </main>
@@ -66,16 +65,23 @@ export default function DashboardShell({
   );
 
   return (
-    <main className="min-h-dvh overflow-y-auto bg-[var(--color-canvas)] text-[var(--color-ink)]">
+    <main className="min-h-dvh overflow-y-auto bg-[var(--color-paper)] text-[var(--color-ink)]">
       <div className="flex min-h-dvh">
         <aside
-          className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-[var(--color-line)] bg-[var(--color-canvas)] p-5 transition-transform lg:static lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-[var(--color-ink)]/10 bg-[var(--color-paper)] p-5 transition-transform lg:static lg:translate-x-0 ${
             open ? "translate-x-0" : "-translate-x-full"
           }`}
         >
           <div className="flex items-center justify-between">
-            <Link href="/" className="text-xl font-extralight tracking-[-0.04em]">
-              photo<span className="text-[var(--color-muted)]"> api</span>
+            <Link href="/" className="flex items-center gap-2.5">
+              <Image
+                src="/logotransp.png"
+                alt="photo agents"
+                width={24}
+                height={24}
+                className="opacity-90"
+              />
+              <span className="text-sm uppercase tracking-[0.28em]">photo agents</span>
             </Link>
             <button className="lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
               <X size={20} />
@@ -96,15 +102,10 @@ export default function DashboardShell({
                   href={item.href}
                   className={`group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-light transition ${
                     isActive
-                      ? "bg-white text-[var(--color-ink)] shadow-sm"
-                      : "text-[var(--color-muted)] hover:bg-white/60 hover:text-[var(--color-ink)]"
+                      ? "bg-[var(--color-canvas)] text-[var(--color-ink)] shadow-[0_8px_24px_-12px_rgba(14,18,16,0.3)]"
+                      : "text-[var(--color-ink)]/65 hover:bg-[var(--color-ink)]/5 hover:text-[var(--color-ink)]"
                   }`}
                 >
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      isActive ? "bg-[var(--color-ink)]" : "bg-[var(--color-line)]"
-                    }`}
-                  />
                   <Icon size={17} strokeWidth={1.5} />
                   {item.label}
                 </Link>
@@ -112,33 +113,27 @@ export default function DashboardShell({
             })}
           </nav>
 
-          <div className="absolute bottom-5 left-5 right-5 rounded-[1.5rem] border border-[var(--color-line)] bg-white/60 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-muted)]">
-              Current plan
-            </p>
-            <p className="mt-2 text-2xl font-extralight">$15/mo</p>
-            <p className="mt-1 text-sm font-light text-[var(--color-muted)]">
-              50k monthly requests
-            </p>
+          <div className="mt-auto pt-6 text-[11px] uppercase tracking-[0.22em] text-[var(--color-ink)]/45">
+            v0.1 — preview
           </div>
         </aside>
 
         {open ? (
           <button
-            className="fixed inset-0 z-30 bg-[var(--color-ink)]/20 lg:hidden"
+            className="fixed inset-0 z-30 bg-[var(--color-ink)]/30 lg:hidden"
             onClick={() => setOpen(false)}
             aria-label="Close menu overlay"
           />
         ) : null}
 
         <section className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-[var(--color-line)] bg-[var(--color-canvas)]/85 px-5 backdrop-blur md:px-8">
+          <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-[var(--color-ink)]/10 bg-[var(--color-paper)]/85 px-5 backdrop-blur md:px-8">
             <div className="flex items-center gap-4">
               <button className="lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
                 <Menu size={22} />
               </button>
               <div>
-                <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">
+                <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-ink)]/55">
                   Dashboard
                 </p>
                 <h1 className="text-2xl font-extralight tracking-[-0.04em]">
@@ -152,7 +147,7 @@ export default function DashboardShell({
                 <p>{label}</p>
                 <button
                   onClick={logout}
-                  className="text-xs text-[var(--color-muted)] transition hover:text-[var(--color-ink)]"
+                  className="text-xs text-[var(--color-ink)]/55 transition hover:text-[var(--color-ink)]"
                 >
                   Sign out
                 </button>

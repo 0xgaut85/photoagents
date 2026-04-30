@@ -2,28 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
-import { Badge, Button, Card, Input, Modal, Table } from "../../_components/ui";
-import { type ApiKey, mockKeys } from "../../_lib/mock";
-import { createKey as apiCreateKey, fetchKeys, revokeKey as apiRevokeKey } from "../../_lib/api";
+import { Badge, Button, Card, EmptyState, Input, Modal, Table } from "../../_components/ui";
+import { type ApiKey, createKey, fetchKeys, revokeKey } from "../../_lib/api";
 import { useDashboardAuth } from "../../_components/DashboardAuth";
 
-function newMockSecret() {
-  return `pk_live_${crypto.randomUUID().replaceAll("-", "").slice(0, 28)}`;
-}
-
 export default function KeysPage() {
-  const { apiFetch, mockMode } = useDashboardAuth();
-  const [keys, setKeys] = useState<ApiKey[]>(mockMode ? mockKeys : []);
-  const [loading, setLoading] = useState(!mockMode);
+  const { apiFetch } = useDashboardAuth();
+  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [keyName, setKeyName] = useState("New production key");
+  const [keyName, setKeyName] = useState("Production key");
   const [revealed, setRevealed] = useState("");
   const [copied, setCopied] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (mockMode) return;
     setLoading(true);
     setError(null);
     try {
@@ -34,7 +28,7 @@ export default function KeysPage() {
     } finally {
       setLoading(false);
     }
-  }, [apiFetch, mockMode]);
+  }, [apiFetch]);
 
   useEffect(() => {
     refresh();
@@ -47,24 +41,9 @@ export default function KeysPage() {
 
   const handleCreate = async () => {
     setError(null);
-    if (mockMode) {
-      const secret = newMockSecret();
-      const next: ApiKey = {
-        id: crypto.randomUUID(),
-        name: keyName || "Untitled key",
-        prefix: `${secret.slice(0, 8)}••••${secret.slice(-4)}`,
-        createdAt: "Today",
-        lastUsed: "Never",
-        status: "active",
-      };
-      setKeys((current) => [next, ...current]);
-      setRevealed(secret);
-      return;
-    }
-
     setSubmitting(true);
     try {
-      const { key, secret } = await apiCreateKey(apiFetch, keyName || "Untitled key");
+      const { key, secret } = await createKey(apiFetch, keyName || "Untitled key");
       setKeys((current) => [key, ...current]);
       setRevealed(secret);
     } catch (err) {
@@ -75,15 +54,9 @@ export default function KeysPage() {
   };
 
   const handleRevoke = async (id: string) => {
-    if (mockMode) {
-      setKeys((current) =>
-        current.map((key) => (key.id === id ? { ...key, status: "revoked" } : key)),
-      );
-      return;
-    }
     setError(null);
     try {
-      const updated = await apiRevokeKey(apiFetch, id);
+      const updated = await revokeKey(apiFetch, id);
       setKeys((current) => current.map((key) => (key.id === id ? updated : key)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to revoke key");
@@ -100,16 +73,15 @@ export default function KeysPage() {
     <div className="flex flex-col gap-8">
       <Card className="flex flex-col justify-between gap-8 md:flex-row md:items-end">
         <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-[var(--color-muted)]">
+          <p className="text-xs uppercase tracking-[0.28em] text-[var(--color-ink)]/55">
             API keys
           </p>
           <h2 className="mt-4 text-5xl font-extralight tracking-[-0.06em]">
             Create the eyes.
           </h2>
-          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[var(--color-muted)]">
-            {mockMode
-              ? "Local mock mode — keys never leave the browser. Set NEXT_PUBLIC_PRIVY_APP_ID to switch to the real backend."
-              : "Each key is shown exactly once. Store it somewhere safe; we only keep a hash."}
+          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[var(--color-ink)]/65">
+            Each key is shown exactly once. We only keep a hash. If you lose the
+            secret, generate a new one.
           </p>
         </div>
         <Button onClick={() => setOpen(true)}>
@@ -121,28 +93,38 @@ export default function KeysPage() {
         <Card className="border-red-200 bg-red-50 text-sm text-red-700">{error}</Card>
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <p className="text-sm text-[var(--color-muted)]">Active keys</p>
-          <p className="mt-3 text-4xl font-extralight">{activeCount}</p>
+      <section className="grid gap-4 md:grid-cols-2">
+        <Card className="flex flex-col gap-2">
+          <p className="text-sm text-[var(--color-ink)]/55">Active keys</p>
+          <p className="text-4xl font-extralight tracking-[-0.04em]">
+            {loading ? "—" : activeCount}
+          </p>
         </Card>
-        <Card>
-          <p className="text-sm text-[var(--color-muted)]">Total keys</p>
-          <p className="mt-3 text-4xl font-extralight">{keys.length}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-[var(--color-muted)]">Mode</p>
-          <p className="mt-3 text-4xl font-extralight">{mockMode ? "Mock" : "Live"}</p>
+        <Card className="flex flex-col gap-2">
+          <p className="text-sm text-[var(--color-ink)]/55">Total keys</p>
+          <p className="text-4xl font-extralight tracking-[-0.04em]">
+            {loading ? "—" : keys.length}
+          </p>
         </Card>
       </section>
 
       <Card>
         {loading ? (
-          <p className="py-12 text-center text-sm text-[var(--color-muted)]">Loading keys…</p>
-        ) : keys.length === 0 ? (
-          <p className="py-12 text-center text-sm text-[var(--color-muted)]">
-            No keys yet. Create one to start hitting the API.
+          <p className="py-12 text-center text-sm text-[var(--color-ink)]/55">
+            Loading keys…
           </p>
+        ) : keys.length === 0 ? (
+          <EmptyState
+            title="No keys yet"
+            action={
+              <Button onClick={() => setOpen(true)}>
+                <KeyRound size={15} /> Create your first key
+              </Button>
+            }
+          >
+            Generate a key, drop it into your local config, and start sending
+            images to the API.
+          </EmptyState>
         ) : (
           <Table
             headers={["Name", "Key", "Created", "Last used", "Status", ""]}
@@ -150,7 +132,7 @@ export default function KeysPage() {
               <span key="name" className="font-normal">
                 {key.name}
               </span>,
-              <code key="prefix" className="rounded-full bg-[var(--color-line)] px-3 py-1 text-xs">
+              <code key="prefix" className="rounded-full bg-[var(--color-ink)]/[0.06] px-3 py-1 text-xs">
                 {key.prefix}
               </code>,
               key.createdAt,
@@ -163,8 +145,8 @@ export default function KeysPage() {
                   <Trash2 size={15} /> Revoke
                 </Button>
               ) : (
-                <span key="empty" className="text-[var(--color-muted)]">
-                  -
+                <span key="empty" className="text-[var(--color-ink)]/40">
+                  —
                 </span>
               ),
             ])}
@@ -178,15 +160,18 @@ export default function KeysPage() {
         onClose={() => {
           setOpen(false);
           setRevealed("");
-          setKeyName("New production key");
+          setKeyName("Production key");
         }}
       >
         {revealed ? (
           <div className="flex flex-col gap-5">
-            <p className="text-sm leading-relaxed text-[var(--color-muted)]">
-              This is the only time the full secret will be shown.
+            <p className="text-sm leading-relaxed text-[var(--color-ink)]/65">
+              This is the only time the full secret will be shown. Store it
+              somewhere safe.
             </p>
-            <code className="break-all rounded-2xl bg-white p-4 text-sm">{revealed}</code>
+            <code className="break-all rounded-2xl border border-[var(--color-ink)]/10 bg-[var(--color-paper)]/40 p-4 text-sm">
+              {revealed}
+            </code>
             <Button onClick={() => copyText(revealed)}>
               {copied === revealed ? <Check size={16} /> : <Copy size={16} />}
               {copied === revealed ? "Copied" : "Copy key"}
@@ -194,7 +179,7 @@ export default function KeysPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <label className="text-sm text-[var(--color-muted)]">
+            <label className="text-sm text-[var(--color-ink)]/65">
               Key name
               <Input
                 className="mt-2"

@@ -1,5 +1,3 @@
-import type { ApiKey, Invoice } from "./mock";
-
 export type Me = {
   id: string;
   privy_id: string;
@@ -10,6 +8,22 @@ export type Me = {
   plan_renews_at: string | null;
   created_at: string;
   last_seen_at: string;
+};
+
+export type ApiKey = {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  lastUsed: string;
+  status: "active" | "revoked";
+};
+
+export type Invoice = {
+  id: string;
+  date: string;
+  amount: string;
+  status: "paid" | "open";
 };
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;

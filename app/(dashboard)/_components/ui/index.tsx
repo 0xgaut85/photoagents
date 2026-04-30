@@ -11,7 +11,7 @@ export function Card({
 }) {
   return (
     <section
-      className={`rounded-[2rem] border border-[var(--color-line)] bg-white/70 p-6 shadow-[0_24px_80px_rgba(14,18,16,0.06)] ${className}`}
+      className={`rounded-[2rem] border border-[var(--color-ink)]/10 bg-[var(--color-canvas)] p-6 shadow-[0_24px_60px_-30px_rgba(14,18,16,0.35)] ${className}`}
     >
       {children}
     </section>
@@ -29,8 +29,8 @@ export function Button({
   const variants = {
     primary: "bg-[var(--color-ink)] text-[var(--color-canvas)] hover:opacity-90",
     secondary:
-      "border border-[var(--color-line)] bg-white text-[var(--color-ink)] hover:border-[var(--color-ink)]",
-    ghost: "text-[var(--color-ink)] hover:bg-[var(--color-line)]/60",
+      "border border-[var(--color-ink)]/20 bg-[var(--color-canvas)] text-[var(--color-ink)] hover:border-[var(--color-ink)]",
+    ghost: "text-[var(--color-ink)] hover:bg-[var(--color-ink)]/5",
     danger: "bg-[#451b17] text-[var(--color-canvas)] hover:opacity-90",
   };
 
@@ -51,7 +51,7 @@ export function Input({
   return (
     <input
       {...props}
-      className={`w-full rounded-2xl border border-[var(--color-line)] bg-white/80 px-4 py-3 text-sm font-light text-[var(--color-ink)] outline-none transition placeholder:text-[var(--color-muted)] focus:border-[var(--color-ink)] ${className}`}
+      className={`w-full rounded-2xl border border-[var(--color-ink)]/15 bg-[var(--color-canvas)] px-4 py-3 text-sm font-light text-[var(--color-ink)] outline-none transition placeholder:text-[var(--color-ink)]/40 focus:border-[var(--color-ink)] ${className}`}
     />
   );
 }
@@ -64,7 +64,7 @@ export function Badge({
   tone?: "neutral" | "success" | "warning" | "danger";
 }) {
   const tones = {
-    neutral: "border-[var(--color-line)] bg-white text-[var(--color-muted)]",
+    neutral: "border-[var(--color-ink)]/20 bg-[var(--color-canvas)] text-[var(--color-ink)]/70",
     success: "border-[#b7d7c2] bg-[#edf7ef] text-[#315b3f]",
     warning: "border-[#decf9a] bg-[#fbf5d9] text-[#6b5d22]",
     danger: "border-[#e3bbb3] bg-[#fbede9] text-[#7a3025]",
@@ -86,12 +86,12 @@ export function Table({
   rows: ReactNode[][];
 }) {
   return (
-    <div className="overflow-hidden rounded-[1.5rem] border border-[var(--color-line)] bg-white/60">
+    <div className="overflow-hidden rounded-[1.5rem] border border-[var(--color-ink)]/10">
       <table className="w-full border-collapse text-left text-sm">
-        <thead className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted)]">
+        <thead className="bg-[var(--color-ink)]/[0.04] text-xs uppercase tracking-[0.18em] text-[var(--color-ink)]/60">
           <tr>
             {headers.map((header) => (
-              <th key={header} className="border-b border-[var(--color-line)] px-5 py-4 font-light">
+              <th key={header} className="border-b border-[var(--color-ink)]/10 px-5 py-4 font-light">
                 {header}
               </th>
             ))}
@@ -99,7 +99,7 @@ export function Table({
         </thead>
         <tbody>
           {rows.map((row, rowIndex) => (
-            <tr key={rowIndex} className="border-b border-[var(--color-line)] last:border-0">
+            <tr key={rowIndex} className="border-b border-[var(--color-ink)]/10 last:border-0">
               {row.map((cell, cellIndex) => (
                 <td key={cellIndex} className="px-5 py-4 font-light">
                   {cell}
@@ -124,12 +124,12 @@ export function Stat({
 }) {
   return (
     <Card className="flex min-h-36 flex-col justify-between">
-      <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">
+      <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-ink)]/55">
         {label}
       </p>
       <div>
         <p className="text-4xl font-extralight tracking-[-0.04em]">{value}</p>
-        {detail ? <p className="mt-2 text-sm text-[var(--color-muted)]">{detail}</p> : null}
+        {detail ? <p className="mt-2 text-sm text-[var(--color-ink)]/60">{detail}</p> : null}
       </div>
     </Card>
   );
@@ -138,16 +138,19 @@ export function Stat({
 export function EmptyState({
   title,
   children,
+  action,
 }: {
   title: string;
   children: ReactNode;
+  action?: ReactNode;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-dashed border-[var(--color-line)] p-8 text-center">
-      <h3 className="text-xl font-extralight">{title}</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[var(--color-muted)]">
+    <div className="flex flex-col items-center gap-4 rounded-[1.5rem] border border-dashed border-[var(--color-ink)]/15 bg-[var(--color-canvas)]/40 px-8 py-12 text-center">
+      <h3 className="text-xl font-extralight tracking-[-0.02em]">{title}</h3>
+      <p className="max-w-md text-sm leading-relaxed text-[var(--color-ink)]/60">
         {children}
       </p>
+      {action}
     </div>
   );
 }
@@ -166,8 +169,8 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-ink)]/30 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-[2rem] border border-[var(--color-line)] bg-[var(--color-canvas)] p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-ink)]/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-[2rem] border border-[var(--color-ink)]/10 bg-[var(--color-canvas)] p-6 shadow-2xl">
         <div className="mb-6 flex items-center justify-between gap-4">
           <h2 className="text-2xl font-extralight tracking-[-0.03em]">{title}</h2>
           <Button variant="ghost" onClick={onClose} aria-label="Close modal">
