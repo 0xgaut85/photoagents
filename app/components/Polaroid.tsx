@@ -1,6 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, type RefObject } from "react";
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Center, Environment, useGLTF, useTexture } from "@react-three/drei";
 import { EffectComposer, Noise } from "@react-three/postprocessing";
@@ -207,7 +214,14 @@ function CursorRotator({ targetRef }: { targetRef: RefObject<CursorTarget> }) {
     if (!groupRef.current) return;
     const { x, y, engaged } = targetRef.current;
 
-    spinPhase.current += IDLE_SPIN_SPEED * delta;
+    // Clamp delta. When the tab regains focus after being hidden, browsers
+    // can deliver a single frame whose delta covers the entire away time
+    // (seconds or minutes). Without clamping, the polaroid would jump
+    // ahead by hundreds of rotations in one frame and then visibly "catch
+    // up" via lerp — looks like a frantic spin. ~33ms = one frame at 30fps.
+    const dt = Math.min(delta, 1 / 30);
+
+    spinPhase.current += IDLE_SPIN_SPEED * dt;
 
     // Roll always eases back to rest — no sideways lean.
     groupRef.current.rotation.z +=
@@ -244,6 +258,7 @@ function CursorRotator({ targetRef }: { targetRef: RefObject<CursorTarget> }) {
 
 export default function Polaroid() {
   const targetRef = useRef<CursorTarget>({ x: 0, y: 0, engaged: false });
+  const [tabVisible, setTabVisible] = useState(true);
 
   // Track the cursor across the entire viewport so the polaroid follows
   // even when the user is hovering over text, the right panel, etc.
@@ -257,6 +272,17 @@ export default function Polaroid() {
     return () => window.removeEventListener("pointermove", handleMove);
   }, []);
 
+  // Pause the render loop entirely when the tab is hidden. R3F's `frameloop`
+  // prop is reactive, so flipping it between "always" and "never" stops/resumes
+  // the canvas without a remount. Combined with the delta clamp inside
+  // CursorRotator, this guarantees no spin "catch-up" on tab return.
+  useEffect(() => {
+    const sync = () => setTabVisible(!document.hidden);
+    sync();
+    document.addEventListener("visibilitychange", sync);
+    return () => document.removeEventListener("visibilitychange", sync);
+  }, []);
+
   return (
     <div className="h-full w-full">
       <Canvas
@@ -264,6 +290,7 @@ export default function Polaroid() {
         camera={{ position: [0, 0, 5], fov: 35 }}
         gl={{ antialias: true, alpha: true }}
         style={{ background: "transparent" }}
+        frameloop={tabVisible ? "always" : "never"}
       >
         <ambientLight intensity={0.6} />
         <directionalLight position={[3, 4, 5]} intensity={1.2} />
