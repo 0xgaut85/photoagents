@@ -32,7 +32,10 @@ type HelioConfig = {
   primaryColor?: string;
   neutralColor?: string;
   display?: "inline" | "modal";
-  additionalJSON?: string;
+  // Helio expects a plain object here (their docs example is `additionalJSON: { ... }`).
+  // Passing a stringified JSON causes Helio to silently drop it and store null
+  // on the transaction, breaking webhook + REST matching.
+  additionalJSON?: Record<string, unknown>;
   customerDetails?: { email?: string };
   onSuccess?: (event: unknown) => void;
   onError?: (event: unknown) => void;
@@ -150,9 +153,9 @@ export default function BillingPage() {
           primaryColor: "#141714",
           neutralColor: "#BEBDBB",
           display: "inline",
-          additionalJSON: JSON.stringify({
+          additionalJSON: {
             externalPaymentId: intent.external_payment_id,
-          }),
+          },
           ...(intent.email ? { customerDetails: { email: intent.email } } : {}),
           onStartPayment: () => setNotice("Payment started…"),
           onPending: () => setNotice("Payment pending — waiting for confirmation."),
