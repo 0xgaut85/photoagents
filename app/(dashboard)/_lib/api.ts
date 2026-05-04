@@ -87,6 +87,20 @@ export async function fetchInvoices(apiFetch: Fetcher): Promise<Invoice[]> {
   return payments.map(toInvoice);
 }
 
+export type SyncResult = {
+  matched: number;
+  plan: {
+    status: PlanStatus;
+    renews_at: string | null;
+    trial_ends_at: string | null;
+  };
+};
+
+export async function syncPayments(apiFetch: Fetcher): Promise<SyncResult> {
+  const res = await apiFetch("/api/billing/sync", { method: "POST" });
+  return readJson<SyncResult>(res);
+}
+
 type ServerKey = {
   id: string;
   name: string;

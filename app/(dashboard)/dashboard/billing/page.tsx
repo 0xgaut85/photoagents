@@ -9,6 +9,7 @@ import {
   createPaymentIntent,
   fetchInvoices,
   fetchMe,
+  syncPayments,
   type Invoice,
   type Me,
 } from "../../_lib/api";
@@ -61,6 +62,7 @@ export default function BillingPage() {
   const [scriptReady, setScriptReady] = useState(false);
   const [widgetReady, setWidgetReady] = useState(false);
   const [intentError, setIntentError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -79,9 +81,46 @@ export default function BillingPage() {
     }
   }, [apiFetch]);
 
+  // Pull confirmed transactions from Helio's API and reconcile against our
+  // local payments table. This is the primary path; the webhook is backup.
+  const sync = useCallback(
+    async (silent = false) => {
+      if (mockMode) return;
+      if (!silent) setSyncing(true);
+      try {
+        const result = await syncPayments(apiFetch);
+        if (result.matched > 0) {
+          setNotice(
+            result.matched === 1
+              ? "Payment confirmed. Plan extended."
+              : `${result.matched} payments confirmed. Plan extended.`,
+          );
+          await refresh();
+        } else if (!silent) {
+          setNotice("No new confirmed payments yet. Try again in a moment.");
+        }
+      } catch (err) {
+        if (!silent) {
+          setError(err instanceof Error ? err.message : "Could not sync with Helio");
+        }
+      } finally {
+        if (!silent) setSyncing(false);
+      }
+    },
+    [apiFetch, mockMode, refresh],
+  );
+
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Auto-sync on mount: catches the case where the user paid in a previous
+  // session, closed the tab before onSuccess fired, and is now coming back.
+  // Silent so it doesn't show an error toast if Helio is briefly unreachable.
+  useEffect(() => {
+    if (mockMode) return;
+    void sync(true);
+  }, [mockMode, sync]);
 
   // Mount the Helio embed widget once the script + container are both ready.
   useEffect(() => {
@@ -118,10 +157,12 @@ export default function BillingPage() {
           onStartPayment: () => setNotice("Payment started…"),
           onPending: () => setNotice("Payment pending — waiting for confirmation."),
           onSuccess: () => {
-            setNotice("Payment confirmed. Refreshing your plan…");
+            setNotice("Payment confirmed. Reconciling with Helio…");
+            // Helio's onSuccess fires before their backend has finished
+            // settling. Wait a beat, then pull the authoritative state.
             setTimeout(() => {
-              refresh();
-            }, 1500);
+              void sync();
+            }, 2000);
           },
           onError: (event) => {
             console.error("Helio onError", event);
@@ -141,7 +182,7 @@ export default function BillingPage() {
     return () => {
       cancelled = true;
     };
-  }, [apiFetch, mockMode, refresh, scriptReady]);
+  }, [apiFetch, mockMode, refresh, scriptReady, sync]);
 
   const planStatus = me?.plan_status ?? "trial";
   const renews = me?.plan_renews_at ?? null;
@@ -240,9 +281,16 @@ export default function BillingPage() {
               Paper trail
             </h3>
           </div>
-          <Button variant="ghost" onClick={refresh} disabled={loading}>
-            <RefreshCcw size={14} /> Refresh
-          </Button>
+          <div className="flex gap-2">
+            {!mockMode ? (
+              <Button variant="ghost" onClick={() => sync(false)} disabled={syncing}>
+                <RefreshCcw size={14} /> {syncing ? "Syncing…" : "Sync from Helio"}
+              </Button>
+            ) : null}
+            <Button variant="ghost" onClick={refresh} disabled={loading}>
+              <RefreshCcw size={14} /> Refresh
+            </Button>
+          </div>
         </div>
         {loading ? (
           <p className="py-8 text-center text-sm text-[var(--color-ink)]/55">Loading…</p>
