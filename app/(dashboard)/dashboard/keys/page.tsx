@@ -1,13 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Input, Modal, Table } from "../../_components/ui";
-import { type ApiKey, createKey, fetchKeys, revokeKey } from "../../_lib/api";
+import {
+  type ApiKey,
+  type PlanStatus,
+  createKey,
+  fetchKeys,
+  fetchMe,
+  revokeKey,
+} from "../../_lib/api";
 import { useDashboardAuth } from "../../_components/DashboardAuth";
 
 export default function KeysPage() {
-  const { apiFetch } = useDashboardAuth();
+  const { apiFetch, mockMode } = useDashboardAuth();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,6 +24,8 @@ export default function KeysPage() {
   const [revealed, setRevealed] = useState("");
   const [copied, setCopied] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [planStatus, setPlanStatus] = useState<PlanStatus>("trial");
+  const isExpired = !mockMode && planStatus === "expired";
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -33,6 +43,19 @@ export default function KeysPage() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (mockMode) return;
+    let cancelled = false;
+    fetchMe(apiFetch)
+      .then((me) => {
+        if (!cancelled) setPlanStatus(me.plan_status);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [apiFetch, mockMode]);
 
   const activeCount = useMemo(
     () => keys.filter((key) => key.status === "active").length,
@@ -84,10 +107,25 @@ export default function KeysPage() {
             secret, generate a new one.
           </p>
         </div>
-        <Button onClick={() => setOpen(true)}>
+        <Button onClick={() => setOpen(true)} disabled={isExpired}>
           <Plus size={16} /> Create key
         </Button>
       </Card>
+
+      {isExpired ? (
+        <Card className="flex flex-col gap-3 border-[var(--color-ink)]/15 bg-[var(--color-canvas)] text-sm md:flex-row md:items-center md:justify-between">
+          <p className="text-[var(--color-ink)]/75">
+            Your trial has ended. Existing keys keep working until you revoke them, but you
+            need an active subscription to create new keys.
+          </p>
+          <Link
+            href="/dashboard/billing"
+            className="inline-flex items-center justify-center gap-2 self-start rounded-full bg-[var(--color-ink)] px-4 py-2 text-xs uppercase tracking-[0.22em] text-[var(--color-canvas)] transition-opacity hover:opacity-90 md:self-auto"
+          >
+            Upgrade
+          </Link>
+        </Card>
+      ) : null}
 
       {error ? (
         <Card className="border-red-200 bg-red-50 text-sm text-red-700">{error}</Card>
@@ -117,7 +155,7 @@ export default function KeysPage() {
           <EmptyState
             title="No keys yet"
             action={
-              <Button onClick={() => setOpen(true)}>
+              <Button onClick={() => setOpen(true)} disabled={isExpired}>
                 <KeyRound size={15} /> Create your first key
               </Button>
             }

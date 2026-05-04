@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AuthError, requireUser } from "@/lib/auth";
+import { AuthError, effectivePlanStatus, requireUser } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { type ApiKeyRow, generateSecret } from "@/lib/keys";
 
@@ -29,6 +29,17 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await requireUser(req);
+    const status = effectivePlanStatus({
+      plan_renews_at: user.plan_renews_at,
+      trial_ends_at: user.trial_ends_at,
+    });
+    if (status === "expired") {
+      return NextResponse.json(
+        { error: "Your trial or subscription has expired. Upgrade to create new keys." },
+        { status: 402 },
+      );
+    }
+
     const body = (await req.json().catch(() => ({}))) as { name?: string };
     const name = (body.name ?? "Untitled key").toString().slice(0, 80) || "Untitled key";
 
