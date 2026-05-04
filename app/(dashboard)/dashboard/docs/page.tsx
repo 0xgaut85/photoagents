@@ -188,8 +188,8 @@ export default function DocsPage() {
   };
 
   return (
-    <div className="-mx-5 grid w-[calc(100%+2.5rem)] gap-10 md:-mx-8 md:w-[calc(100%+4rem)] md:gap-12 xl:grid-cols-[220px_minmax(0,1fr)] xl:px-0">
-      <aside className="hidden xl:block xl:pl-8">
+    <div className="grid gap-10 lg:gap-12 xl:grid-cols-[220px_minmax(0,1fr)]">
+      <aside className="hidden xl:block">
         <nav className="sticky top-28 flex flex-col gap-2 text-sm font-light">
           <p className="mb-2 text-xs uppercase tracking-[0.24em] text-[var(--color-ink)]/45">
             On this page
@@ -214,7 +214,7 @@ export default function DocsPage() {
         </nav>
       </aside>
 
-      <div className="flex min-w-0 flex-col gap-10 px-5 md:px-8 xl:pr-8">
+      <div className="flex min-w-0 flex-col gap-10">
         <Card>
           <p className="text-xs uppercase tracking-[0.28em] text-[var(--color-ink)]/55">
             Photo Agents

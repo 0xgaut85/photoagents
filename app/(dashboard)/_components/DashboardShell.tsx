@@ -35,6 +35,7 @@ export default function DashboardShell({
   const { ready, authenticated, label, initial, logout } = useDashboardAuth();
   const [open, setOpen] = useState(false);
   const isLogin = pathname === "/dashboard/login";
+  const isDocs = pathname.startsWith("/dashboard/docs");
 
   useEffect(() => {
     if (ready && !authenticated && !isLogin) {
@@ -158,7 +159,11 @@ export default function DashboardShell({
             </div>
           </header>
 
-          <div className="mx-auto w-full max-w-7xl flex-1 px-5 py-8 md:px-8 lg:py-10">
+          <div
+            className={`mx-auto w-full flex-1 px-5 py-8 md:px-8 lg:py-10 ${
+              isDocs ? "" : "max-w-7xl"
+            }`}
+          >
             {children}
           </div>
         </section>
