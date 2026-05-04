@@ -97,9 +97,8 @@ The longer you use it, the less it costs you and the more it can do.`,
 
   cta: {
     label: "View on GitHub",
-    href: "https://github.com/lsdefine/GenericAgent",
+    href: "https://github.com/jmerelnyc/Photo-agents",
     external: true,
-    comingSoon: true,
   },
 
   ctaSecondary: {
