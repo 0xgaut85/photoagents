@@ -66,7 +66,7 @@ export default function DashboardShell({
   );
 
   return (
-    <main className="min-h-dvh overflow-y-auto bg-[var(--color-paper)] text-[var(--color-ink)]">
+    <main className="h-dvh overflow-y-auto bg-[var(--color-paper)] text-[var(--color-ink)]">
       <div className="flex min-h-dvh">
         <aside
           className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-[var(--color-ink)]/10 bg-[var(--color-paper)] p-5 transition-transform lg:static lg:translate-x-0 ${
